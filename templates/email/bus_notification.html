@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background-color: #e6ab17;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 5px 5px 0 0;
+        }
+        .content {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 0 0 5px 5px;
+        }
+        .info-item {
+            margin-bottom: 10px;
+        }
+        .info-label {
+            font-weight: bold;
+            color: #e6ab17;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Thông báo xe bus trường học</h2>
+        </div>
+        <div class="content">
+            <p>Kính gửi Phụ huynh,</p>
+            
+            <p>Học sinh <strong>{{ student_name }}</strong> đã {{ action }} bus của trường.</p>
+            
+            <div class="info-item">
+                <span class="info-label">Thời gian:</span> {{ time }}
+            </div>
+            
+            <div class="info-item">
+                <span class="info-label">Xe bus:</span> {{ bus_name }}
+            </div>
+            
+            <div class="info-item">
+                <span class="info-label">Tuyến đường:</span> {{ bus_route }}
+            </div>
+            
+            <div class="info-item">
+                <span class="info-label">Tài xế:</span> {{ driver_name }}
+            </div>
+            
+            <div class="info-item">
+                <span class="info-label">Số điện thoại tài xế:</span> {{ driver_phone }}
+            </div>
+            
+            <p>Trân trọng,<br>Ban Quản lý xe bus</p>
+        </div>
+    </div>
+</body>
+</html> 

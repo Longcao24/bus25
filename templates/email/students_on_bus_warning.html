@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background-color: #dc3545;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 5px 5px 0 0;
+        }
+        .content {
+            background-color: #f9f9f9;
+            padding: 20px;
+            border-radius: 0 0 5px 5px;
+        }
+        .warning {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .student-list {
+            margin: 20px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .student-item {
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        .student-item:last-child {
+            border-bottom: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>⚠️ CẢNH BÁO: Còn học sinh trên xe khi xe ngừng hoạt động</h2>
+        </div>
+        <div class="content">
+            <p class="warning">Hệ thống phát hiện còn học sinh trên xe bus khi xe ngừng hoạt động!</p>
+            
+            <h3>Thông tin xe:</h3>
+            <p>
+                <strong>Xe:</strong> {{ bus_name }}<br>
+                <strong>Tuyến đường:</strong> {{ bus_route }}<br>
+                <strong>Tài xế:</strong> {{ driver_name }}<br>
+                <strong>Số điện thoại tài xế:</strong> {{ driver_phone }}<br>
+                <strong>Thời gian:</strong> {{ time }}
+            </p>
+
+            <h3>Danh sách học sinh còn trên xe:</h3>
+            <div class="student-list">
+                {% for student in students %}
+                <div class="student-item">
+                    <strong>Họ tên:</strong> {{ student.name }}<br>
+                    <strong>Lớp:</strong> {{ student.student_class }}<br>
+                    <strong>Số điện thoại:</strong> {{ student.phone_number }}
+                </div>
+                {% endfor %}
+            </div>
+
+            <p>Vui lòng kiểm tra và xử lý ngay!</p>
+            
+            <p>Trân trọng,<br>Hệ thống quản lý xe bus</p>
+        </div>
+    </div>
+</body>
+</html> 

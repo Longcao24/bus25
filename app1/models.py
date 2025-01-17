@@ -3,7 +3,7 @@ from django.utils import timezone
 
 class Student(models.Model):
     name = models.CharField(max_length=100)
-    email = models.EmailField()
+    email = models.EmailField(blank=True, null=True)
     phone_number = models.CharField(max_length=15)
     student_class = models.CharField(max_length=50)
     authorized = models.BooleanField(default=False)
@@ -64,7 +64,7 @@ class CameraConfiguration(models.Model):
     camera_source = models.CharField(max_length=255, help_text="Camera index (0 for default webcam or RTSP/HTTP URL for IP camera)")
     threshold = models.FloatField(default=0.6, help_text="Face recognition confidence threshold")
 
-    def __str__(self):
+    def __str__(self):  
         return self.name
 
 class Bus(models.Model):
@@ -74,6 +74,7 @@ class Bus(models.Model):
     driver_name = models.CharField(max_length=100, null=True, blank=True)
     driver_phone = models.CharField(max_length=20, null=True, blank=True)
     is_active = models.BooleanField(default=True)
+    arduino_port = models.CharField(max_length=50, null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -93,6 +94,5 @@ class StudentAddress(models.Model):
     latitude = models.FloatField()
     longitude = models.FloatField()
     pickup_time = models.TimeField()
-
     def __str__(self):
         return f"{self.student.name}'s Address"

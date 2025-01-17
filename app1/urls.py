@@ -36,6 +36,8 @@ urlpatterns = [
     path('update-bus-status/<int:bus_id>/', views.update_bus_status, name='update-bus-status'),
     path('get-student-status/<int:bus_id>/', views.get_student_status, name='get-student-status'),
     path('get-student-detail/<int:student_id>/', views.get_student_detail, name='get-student-detail'),
+    path('bus-arduino-assign/', views.bus_arduino_assign, name='bus-arduino-assign'),
+    path('get-arduino-ports-status/', views.get_arduino_ports_status, name='get-arduino-ports-status'),
 ]
     
 

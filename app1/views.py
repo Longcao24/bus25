@@ -1,3 +1,5 @@
+#Backend Django, Flask(python)
+#Frontend HTML, CSS, JS
 import os
 from tokenize import String
 
@@ -35,6 +37,12 @@ import pytz
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_http_methods
 from django.db import transaction
+import serial
+import serial.tools.list_ports
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
+from .email_service import EmailService
 
 
 # Initialize MTCNN and InceptionResnetV1
@@ -105,7 +113,7 @@ def encode_uploaded_images():
 
     return known_face_encodings, known_face_names
 
-# Function to recognize faces
+# Function to recognize faces, face detection on webcam frame
 def recognize_faces(known_encodings, known_names, test_encodings, threshold=0.6):
     recognized_names = []
     for test_encoding in test_encodings:
@@ -117,7 +125,7 @@ def recognize_faces(known_encodings, known_names, test_encodings, threshold=0.6)
             recognized_names.append('Not Recognized')
     return recognized_names
 
-# View for capturing student information and image
+# View for capturing student information and image, add student to database, Websocket
 @login_required
 def capture_student(request):
     if request.method == 'POST':
@@ -166,7 +174,7 @@ def selfie_success(request):
     return render(request, 'selfie_success.html')
 
 
-# This views for capturing studen faces and recognize
+# This views for capturing student faces and recognize
 def capture_and_recognize(request):
     stop_events = []  # List to store stop events for each thread
     camera_threads = []  # List to store threads for each camera
@@ -193,7 +201,7 @@ def capture_and_recognize(request):
             pygame.mixer.init()
             success_sound = pygame.mixer.Sound('app1/suc.wav')  # load sound path
 
-            window_name = f'Face Recognition - {cam_config.name}'
+            window_name = f'Face Recognition - {cam_config.name}' #Set window name
             camera_windows.append(window_name)  # Track the window name
 
             while not stop_event.is_set():
@@ -240,6 +248,14 @@ def capture_and_recognize(request):
                                             student.is_on_bus = True
                                             student.save()
                                             success_sound.play()
+                                            
+                                            # Send email notification for check-in
+                                            if student.email and student.bus:
+                                                print(f"Sending check-in email for {student.name}")
+                                                email_service = EmailService()
+                                                email_service.send_email_async(student, student.bus, 'check_in', current_time)
+                                                print(f"Check-in email sent for {student.name}")
+                                            
                                             cv2.putText(frame, f"{name} checked in.", (50, 50), 
                                                       cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
 
@@ -252,6 +268,14 @@ def capture_and_recognize(request):
                                                 student.is_on_bus = False
                                                 student.save()
                                                 success_sound.play()
+                                                
+                                                # Send email notification for check-out
+                                                if student.email and student.bus:
+                                                    print(f"Sending check-out email for {student.name}")
+                                                    email_service = EmailService()
+                                                    email_service.send_email_async(student, student.bus, 'check_out', current_time)
+                                                    print(f"Check-out email sent for {student.name}")
+                                                
                                                 cv2.putText(frame, f"{name} checked out.", (50, 50), 
                                                           cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
                                             else:
@@ -272,6 +296,14 @@ def capture_and_recognize(request):
                                                 student.is_on_bus = True
                                                 student.save()
                                                 success_sound.play()
+                                                
+                                                # Add email notification for check-in after timeout
+                                                if student.email and student.bus:
+                                                    print(f"Sending check-in email for {student.name}")
+                                                    email_service = EmailService()
+                                                    email_service.send_email_async(student, student.bus, 'check_in', current_time)
+                                                    print(f"Check-in email sent for {student.name}")
+                                                
                                                 cv2.putText(frame, f"{name} checked in.", (50, 50), 
                                                           cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2, cv2.LINE_AA)
                                             else:
@@ -674,35 +706,54 @@ def bus_delete(request, pk):
         return redirect('bus-list')
     return render(request, 'bus_delete_confirm.html', {'bus': bus})
 
+@login_required
 def toggle_student_bus_status(request, student_id, bus_id):
     if request.method == 'POST':
-        student = get_object_or_404(Student, id=student_id)
-        bus = get_object_or_404(Bus, id=bus_id)
-        current_time = timezone.now()
-        current_date = current_time.date()
+        try:
+            student = get_object_or_404(Student, id=student_id)
+            print(f"Student email: {student.email}")
+            bus = get_object_or_404(Bus, id=bus_id)
+            current_time = timezone.now()
+            current_date = current_time.date()
 
-        # Get or create today's attendance record
-        attendance, created = Attendance.objects.get_or_create(
-            student=student,
-            date=current_date
-        )
+            # Get or create today's attendance record
+            attendance, created = Attendance.objects.get_or_create(
+                student=student,
+                date=current_date
+            )
 
-        # If student is not on bus (last action was check-out or no action)
-        if not student.is_on_bus:
-            # Clear any previous check-out time and set new check-in time
-            attendance.check_out_time = None
-            attendance.check_in_time = current_time
-            student.is_on_bus = True
-        else:
-            # Clear any previous check-in time and set new check-out time
-            attendance.check_in_time = None
-            attendance.check_out_time = current_time
-            student.is_on_bus = False
+            # If student is not on bus (last action was check-out or no action)
+            if not student.is_on_bus:
+                attendance.check_out_time = None
+                attendance.check_in_time = current_time
+                student.is_on_bus = True
+                student.last_check_in = current_time
+                action = 'check_in'
+                print(f"Student {student.name} checking in")
+            else:
+                attendance.check_in_time = None
+                attendance.check_out_time = current_time
+                student.is_on_bus = False
+                student.last_check_out = current_time
+                action = 'check_out'
+                print(f"Student {student.name} checking out")
 
-        attendance.save()
-        student.save()
+            attendance.save()
+            student.save()
 
-        return redirect('bus-detail', pk=bus_id)
+            # Send email notification asynchronously
+            if student.email:
+                print(f"Initiating async email send to {student.email}")
+                email_service = EmailService()
+                email_service.send_email_async(student, bus, action, current_time)
+                print("Async email send initiated")
+
+            return redirect('bus-detail', pk=bus_id)
+
+        except Exception as e:
+            print(f"Error in toggle_student_bus_status: {str(e)}")
+            print(traceback.format_exc())
+            return redirect('bus-detail', pk=bus_id)
 
     return redirect('bus-detail', pk=bus_id)
 
@@ -901,19 +952,36 @@ def get_bus_locations(request):
 def update_bus_status(request, bus_id):
     try:
         bus = Bus.objects.get(id=bus_id)
-        data = json.loads(request.body)
-        is_active = data.get('is_active', False)
         
-        if not is_active:
-            # Clear the location when bus is turned off
-            DriverLocation.objects.filter(bus=bus).delete()
+        # Get Arduino status
+        arduino_status = get_arduino_status(bus_id)
+        print(f"Received arduino_status: {arduino_status}")
         
-        bus.is_active = is_active
-        bus.save()
+        # Chỉ gửi email cảnh báo khi:
+        # 1. Xe đang hoạt động (is_active=True)
+        # 2. Arduino báo xe tắt máy (arduino_status=False)
+        # 3. Không có lỗi kết nối Arduino (arduino_status is not None)
+        if bus.is_active and arduino_status is not None and not arduino_status:
+            students_on_bus = Student.objects.filter(bus=bus, is_on_bus=True)
+            if students_on_bus.exists():
+                email_service = EmailService()
+                email_service.send_students_on_bus_warning(bus, students_on_bus)
+        
+        # Update bus status
+        if arduino_status is not None:
+            bus.is_active = arduino_status
+            bus.save()
+            print(f"Updated bus {bus_id} status to {bus.is_active}")
+            
+            if not bus.is_active:
+                DriverLocation.objects.filter(bus=bus).delete()
+                print(f"Cleared location for bus {bus_id}")
         
         return JsonResponse({
             'status': 'success',
-            'message': 'Bus status updated successfully'
+            'arduino_status': arduino_status,
+            'is_active': bus.is_active,
+            'message': f'Bus status updated: {"online" if arduino_status else "offline"}'
         })
     except Bus.DoesNotExist:
         return JsonResponse({
@@ -969,3 +1037,205 @@ def get_student_detail(request, student_id):
     }
     
     return JsonResponse(data)
+
+def get_arduino_status(bus_id):
+    try:
+        bus = Bus.objects.get(id=bus_id)
+        if not bus.arduino_port:
+            print(f"No Arduino port assigned for bus {bus_id}")
+            return None
+            
+        try:
+            # Add port access retries
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    ser = serial.Serial(bus.arduino_port, 9600, timeout=1)
+                    break
+                except PermissionError:
+                    if attempt == max_retries - 1:
+                        raise
+                    time.sleep(1)
+                    
+            # Wait for Arduino reset
+            time.sleep(2)
+            
+            # Clear buffers
+            ser.reset_input_buffer()
+            ser.reset_output_buffer()
+            
+            # Read with validation
+            valid_readings = 0
+            for _ in range(3):
+                status = ser.readline().decode('utf-8').strip()
+                if status in ['0', '1']:
+                    valid_readings += 1
+                    last_valid = status
+                    
+            ser.close()
+            
+            if valid_readings >= 2:
+                return bool(int(last_valid))
+            return None
+
+        except serial.SerialException as e:
+            print(f"Serial error for bus {bus_id}: {str(e)}")
+            return None
+            
+    except Bus.DoesNotExist:
+        return None
+
+@login_required
+def bus_arduino_assign(request):
+    if request.method == 'POST':
+        bus_id = request.POST.get('bus_id')
+        arduino_port = request.POST.get('arduino_port')
+        action = request.POST.get('action')
+        
+        try:
+            bus = Bus.objects.get(id=bus_id)
+            
+            if action == 'unassign':
+                old_port = bus.arduino_port
+                bus.arduino_port = None
+                bus.save()
+                messages.success(request, f'Đã hủy gán cổng {old_port} khỏi xe {bus.name}')
+            else:
+                bus.arduino_port = arduino_port
+                bus.save()
+                messages.success(request, f'Đã gán cổng {arduino_port} cho xe {bus.name}')
+                
+        except Bus.DoesNotExist:
+            messages.error(request, 'Không tìm thấy xe bus')
+        
+        return redirect('bus-arduino-assign')
+    
+    available_ports = [
+        p.device for p in serial.tools.list_ports.comports()
+        if 'Arduino' in p.description or 'CH340' in p.description
+    ]
+    
+    buses = Bus.objects.all()
+    return render(request, 'bus_arduino_assign.html', {
+        'buses': buses,
+        'available_ports': available_ports
+    })
+
+@login_required
+def get_arduino_ports_status(request):
+    ports = []
+    for port in serial.tools.list_ports.comports():
+        if 'Arduino' in port.description or 'CH340' in port.description:
+            try:
+                ser = serial.Serial(port.device, 9600, timeout=1)
+                ser.close()
+                connected = True
+            except:
+                connected = False
+                
+            ports.append({
+                'name': port.device,
+                'description': port.description,
+                'connected': connected
+            })
+    
+    return JsonResponse({'ports': ports})
+
+def send_bus_notification_email(student, bus, action, current_time):
+    subject = f'Thông báo xe bus - {student.name}'
+    
+    # Create context for email template
+    context = {
+        'student_name': student.name,
+        'bus_name': bus.name,
+        'bus_route': bus.route,
+        'driver_name': bus.driver_name,
+        'driver_phone': bus.driver_phone,
+        'action': 'lên xe' if action == 'check_in' else 'xuống xe',
+        'time': current_time.strftime('%H:%M:%S %d/%m/%Y')
+    }
+    
+    # Render HTML email template
+    html_message = render_to_string('email/bus_notification.html', context)
+    plain_message = strip_tags(html_message)
+    
+    # Send email
+    try:
+        send_mail(
+            subject=subject,
+            message=plain_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[student.email],
+            html_message=html_message,
+            fail_silently=False,
+        )
+        return True
+    except Exception as e:
+        print(f"Failed to send email: {str(e)}")
+        return False
+
+@login_required
+def process_face_recognition(request, student, confidence):
+    try:
+        print(f"\nProcessing face recognition for student: {student.name}")
+        current_time = timezone.now()
+        current_date = current_time.date()
+        
+        # Get the student's bus
+        bus = student.bus
+        if not bus:
+            print(f"No bus assigned to student {student.name}")
+            return False
+
+        # Get or create attendance record
+        attendance, created = Attendance.objects.get_or_create(
+            student=student,
+            date=current_date
+        )
+
+        # Update student status
+        if not student.is_on_bus:
+            print(f"Student {student.name} checking in")
+            attendance.check_out_time = None
+            attendance.check_in_time = current_time
+            student.is_on_bus = True
+            student.last_check_in = current_time
+            action = 'check_in'
+        else:
+            print(f"Student {student.name} checking out")
+            attendance.check_in_time = None
+            attendance.check_out_time = current_time
+            student.is_on_bus = False
+            student.last_check_out = current_time
+            action = 'check_out'
+
+        attendance.save()
+        student.save()
+
+        # Send email notification
+        if student.email:
+            print(f"\nAttempting to send email notification to {student.email}")
+            email_service = EmailService()
+            email_sent = email_service.send_bus_notification(student, bus, action, current_time)
+            if email_sent:
+                print("Email sent successfully")
+            else:
+                print("Failed to send email")
+        else:
+            print(f"No email address available for student {student.name}")
+
+        # Add this debug code before sending email
+        print(f"\nDebug Information:")
+        print(f"Student: {student.name}")
+        print(f"Email: {student.email}")
+        print(f"Bus: {student.bus}")
+        print(f"Action: {action}")
+        print(f"Current time: {current_time}")
+
+        return True
+
+    except Exception as e:
+        print(f"Error in process_face_recognition: {str(e)}")
+        import traceback
+        print(traceback.format_exc())
+        return False

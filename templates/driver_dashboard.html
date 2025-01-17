@@ -70,6 +70,7 @@
             font-size: 0.9rem;
             display: inline-flex;
             align-items: center;
+            cursor: default;
         }
 
         .status-on {
@@ -133,9 +134,9 @@
         <div class="dashboard-card">
             <div class="d-flex justify-content-between align-items-center mb-3">
                 <h3><i class="fas fa-map-marker-alt me-2"></i>Vị trí hiện tại</h3>
-                <button id="toggleEngine" class="btn btn-danger">
-                    <i class="fas fa-power-off me-2"></i>Tắt máy xe
-                </button>
+                <div id="toggleEngine" class="status-badge">
+                    <i class="fas fa-power-off me-2"></i>Đang kiểm tra...
+                </div>
             </div>
             <div id="map"></div>
         </div>
@@ -349,43 +350,52 @@
         });
 
         const toggleEngineBtn = document.getElementById('toggleEngine');
-        let isEngineOn = true;
+        toggleEngineBtn.disabled = true; // Make button non-clickable
 
-        toggleEngineBtn.addEventListener('click', function() {
-            isEngineOn = !isEngineOn;
-            
-            fetch('/update-bus-status/{{ bus.id }}/', {
+        function updateEngineStatus() {
+            fetch(`/update-bus-status/${busId}/`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': '{{ csrf_token }}'
                 },
-                body: JSON.stringify({
-                    is_active: isEngineOn
-                })
+                body: JSON.stringify({})
             })
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    if (isEngineOn) {
-                        toggleEngineBtn.classList.remove('btn-success');
-                        toggleEngineBtn.classList.add('btn-danger');
-                        toggleEngineBtn.innerHTML = '<i class="fas fa-power-off me-2"></i>Tắt máy xe';
-                        startLocationTracking();
-                    } else {
-                        toggleEngineBtn.classList.remove('btn-danger');
-                        toggleEngineBtn.classList.add('btn-success');
-                        toggleEngineBtn.innerHTML = '<i class="fas fa-power-off me-2"></i>Khởi động xe';
+                    const engineStatus = document.getElementById('toggleEngine');
+                    
+                    if (data.arduino_status === null) {
+                        engineStatus.className = 'status-badge status-waiting';
+                        engineStatus.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Lỗi kết nối Arduino';
+                        engineStatus.title = 'Kiểm tra kết nối Arduino';
                         stopLocationTracking();
+                    } else {
+                        if (data.is_active) {
+                            engineStatus.className = 'status-badge status-on';
+                            engineStatus.innerHTML = '<i class="fas fa-power-off me-2"></i>Xe đang chạy';
+                            startLocationTracking();
+                        } else {
+                            engineStatus.className = 'status-badge status-off';
+                            engineStatus.innerHTML = '<i class="fas fa-power-off me-2"></i>Xe đã tắt máy';
+                            stopLocationTracking();
+                        }
                     }
                 }
             })
             .catch(error => {
-                console.error('Error updating bus status:', error);
-                // Revert the button state if there's an error
-                isEngineOn = !isEngineOn;
+                console.error('Error:', error);
+                const engineStatus = document.getElementById('toggleEngine');
+                engineStatus.className = 'status-badge status-waiting';
+                engineStatus.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i>Lỗi kết nối';
+                engineStatus.title = 'Không thể kết nối với máy chủ';
+                stopLocationTracking();
             });
-        });
+        }
+
+        // Update status more frequently since it's the only source of truth
+        setInterval(updateEngineStatus, 2000); // Check every 2 seconds
 
         function updateStudentStatus() {
             fetch(`/get-student-status/${busId}/`)

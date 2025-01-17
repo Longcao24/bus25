@@ -112,15 +112,42 @@
             color: white;
             text-decoration: none;
         }
+
+        .management-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .btn-arduino {
+            background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+            color: white;
+            padding: 0.5rem 1.5rem;
+            border-radius: 25px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .btn-arduino:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            color: white;
+        }
     </style>
 </head>
 <body>
     <h1 class="page-title" style="color: #1e3c72;">Danh sách xe bus</h1>
     
     <div class="container">
-        <div class="d-flex justify-content-end mb-4">
+        <div class="management-buttons">
             <a href="{% url 'bus-create' %}" class="btn-action">
                 <i class="fas fa-plus me-2"></i>Thêm xe bus mới
+            </a>
+            <a href="{% url 'bus-arduino-assign' %}" class="btn-arduino">
+                <i class="fas fa-microchip me-2"></i>Gán Thiết Bị
             </a>
         </div>
 
